@@ -2,7 +2,9 @@ FROM golang:1.14-alpine as builder
 
 COPY . /alarms
 
-RUN apk update \
+RUN go env -w GO111MODULE=on \
+  && go env -w GOPROXY=https://goproxy.io,direct \
+  && apk update \
   && apk add git make \
   && go get -u github.com/gobuffalo/packr/v2/packr2 \
   && cd /alarms \
@@ -19,7 +21,7 @@ RUN addgroup -g 1000 go \
   && apk add --no-cache ca-certificates tzdata
 
 COPY --from=builder /alarms/alarms /usr/local/bin/alarms
-COPY --from=builder /alarms/entrypoint.sh /home/go/entrypoint.sh
+COPY --from=builder /alarms/entrypoint.sh /entrypoint.sh
 
 USER go
 
@@ -29,4 +31,4 @@ HEALTHCHECK --timeout=10s CMD [ "wget", "http://127.0.0.1:7001/ping", "-q", "-O"
 
 CMD ["alarms"]
 
-ENTRYPOINT ["entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
