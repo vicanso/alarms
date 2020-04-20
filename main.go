@@ -2,12 +2,15 @@ package main
 
 import (
 	"crypto/tls"
+	"net/http"
 
 	"github.com/vicanso/alarms/config"
 	"github.com/vicanso/alarms/validate"
 	"github.com/vicanso/elton"
 	"github.com/vicanso/elton/middleware"
 	"github.com/vicanso/hes"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"gopkg.in/gomail.v2"
 )
 
@@ -73,6 +76,11 @@ func main() {
 		c.NoContent()
 		return
 	})
+
+	// http1与http2均支持
+	e.Server = &http.Server{
+		Handler: h2c.NewHandler(e, &http2.Server{}),
+	}
 
 	err := e.ListenAndServe(config.GetListen())
 	if err != nil {
