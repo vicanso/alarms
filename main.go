@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"net/http"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/vicanso/elton"
 	"github.com/vicanso/elton/middleware"
 	"github.com/vicanso/hes"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"gopkg.in/gomail.v2"
@@ -24,6 +27,7 @@ type AlarmParams struct {
 var (
 	mailDialer *gomail.Dialer
 	mailSender string
+	logger     *zap.Logger
 )
 
 func init() {
@@ -33,6 +37,15 @@ func init() {
 		mailDialer = gomail.NewDialer(mailConfig.Host, mailConfig.Port, mailConfig.User, mailConfig.Password)
 		mailDialer.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	}
+	c := zap.NewProductionConfig()
+	c.DisableCaller = true
+	c.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	// 只针对panic 以上的日志增加stack trace
+	l, err := c.Build(zap.AddStacktrace(zap.DPanicLevel))
+	if err != nil {
+		panic(err)
+	}
+	logger = l
 }
 
 func main() {
@@ -52,9 +65,24 @@ func main() {
 	// 响应数据转换为json
 	e.Use(middleware.NewDefaultResponder())
 
+	tracker := middleware.NewTracker(middleware.TrackerConfig{
+		OnTrack: func(info *middleware.TrackerInfo, _ *elton.Context) {
+			logger.Info("tracker",
+				zap.Any("form", info.Form),
+				zap.Int("result", info.Result),
+				zap.Error(info.Err),
+			)
+		},
+	})
+
+	e.GET("/ping", func(c *elton.Context) error {
+		c.BodyBuffer = bytes.NewBufferString("pong")
+		return nil
+	})
+
 	receivers := config.GetStringSlice("alarm.receiver")
 	token := config.GetString("alarm.token")
-	e.POST("/alarms", func(c *elton.Context) (err error) {
+	e.POST("/alarms", tracker, func(c *elton.Context) (err error) {
 		params := AlarmParams{}
 		err = validate.Do(&params, c.RequestBody)
 		if err != nil {

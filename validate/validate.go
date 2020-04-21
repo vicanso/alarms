@@ -5,12 +5,10 @@ import (
 	"regexp"
 
 	"github.com/asaskevich/govalidator"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/vicanso/hes"
 )
 
 var (
-	standardJSON         = jsoniter.ConfigCompatibleWithStandardLibrary
 	paramTagRegexMap     = govalidator.ParamTagRegexMap
 	paramTagMap          = govalidator.ParamTagMap
 	customTypeTagMap     = govalidator.CustomTypeTagMap
